@@ -7,14 +7,14 @@
 #define SIZE_KB(kb) 16*kb
 #define SIZE_MB(mb) 16*1024*mb
 
-//#define DEBUG
+#define DEBUG
 
 struct Item {
-#ifdef DEBUG
-    int num;
-#endif
     union {
-        Item *next;
+        struct {
+            Item *next;
+            int num;
+        } body;
         uint8_t data[64];
     } data;
 };
@@ -81,70 +81,56 @@ int main (int argc, char **argv) {
     std::cout << "Shuffle... ";
     shuffle(items, num, &p_first);
     std::cout << "Done!\n";
-    test(p_first, num);
 #ifdef DEBUG
     items_out(items, num, p_first);
 #endif 
+    test(p_first, num);
     delete [] items;
     return 0;
 }
 
 void init (Item* items, const std::size_t num) {
     for (int i = 0; i < num - 1; i++) {
-        items[i].data.next = &items[i+1];        
-#ifdef DEBUG
-        items[i].num = i;
-#endif
+        items[i].data.body.next = &items[i+1];        
+        items[i].data.body.num = i;
     }
-    items[num - 1].data.next = nullptr; 
-#ifdef DEBUG
-    items[num - 1].num = num - 1;
-#endif
+    items[num - 1].data.body.next= nullptr; 
+    items[num - 1].data.body.num = num - 1;
 }
 
 #ifdef DEBUG
 void items_out (Item *items, const std::size_t num, Item *p_first) {
     for (int i = 0; i < num; i++) {
-        std::cout << items[i].num << std::endl;
+        std::cout << items[i].data.body.num << std::endl;
     }
     std::cout << std::endl;
     Item *it = p_first;
     while (it != nullptr) {
-        printf("%d\tnext: %p \n",it->num, it->data.next);
-        it = it->data.next;
+        printf("%d\tnext: %p \n",it->data.body.num, it->data.body.next);
+        it = it->data.body.next;
     }
 }
 #endif
 
 
 void shuffle (Item *items, const std::size_t num, Item **p_first) {
-    for (int i = 0; i < num; i++) {
-        std::size_t new_place = std::rand() % num;   
-        bool found_1 = false;
-        bool found_2 = false;
-        if (&items[i] ==  *p_first) {
-            *p_first = &items[new_place];
-        } else if (&items[new_place] == *p_first) {
-            *p_first = &items[i];
+        for (int i = 0; i < num; i++) {
+        int new_place = std::rand() % num;
+        if (items[i].data.body.next == nullptr || items[new_place].data.body.next == nullptr || i == new_place) {
+            continue;
         }
-        std::swap(items[i], items[new_place]);
-        for (int j = 0; j < num && (!found_1 || !found_2); j++) {
-            if (!found_1) {
-                if (items[j].data.next == &items[i]) {
-                    items[j].data.next = &items[new_place];
-                    found_1 = true;
-                    continue;
-                }
-            }
-            if (!found_2) {
-                if (items[j].data.next == &items[new_place]) {
-                    items[j].data.next = &items[i];
-                    found_2 = true;
-                    continue;
-                }
-            }
+        Item *first_sw, *second_sw;
+        first_sw = items[i].data.body.next;
+        if (&items[new_place] == *p_first) {
+            second_sw = &items[new_place];
+            *p_first = first_sw;
+        } else {
+            second_sw = items[new_place].data.body.next;
+            items[new_place].data.body.next = first_sw;
         }
-    }
+        items[i].data.body.next = second_sw;
+        std::swap(*first_sw, *second_sw);
+    }    
 }
 
 void test(Item *start_p, std::size_t num) {
@@ -154,7 +140,7 @@ void test(Item *start_p, std::size_t num) {
     std::size_t test_num = 0;
     double time_begin = omp_get_wtime();
     while (ptr != nullptr) {
-        ptr = ptr->data.next;
+        ptr = ptr->data.body.next;
         test_num++;
     }
     double time_end = omp_get_wtime();
