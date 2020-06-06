@@ -32,3 +32,5 @@
 *.app
 
 *.exec
+.DS_Store
+*.swp
